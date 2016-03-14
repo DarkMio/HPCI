@@ -24,10 +24,15 @@ public abstract class PiwikConnector {
     protected String expanded;                      // changeable
     protected String flat;                          // changeable
     protected final String LIMIT_RESULTS;           // Limit Results
+    protected final String ID_SITE;
+    protected PeriodEnum periodState;
+    protected Date periodStart;
+    protected Date periodEnd;
 
-    public PiwikConnector(String HOST_URL, String API_KEY) {
+    public PiwikConnector(String HOST_URL, String ID_SITE, String API_KEY) {
         this.HOST_URL = HOST_URL;
         this.API_KEY = API_KEY;
+        this.ID_SITE = ID_SITE;
         this.LANGUAGE = "en";
         this.LIMIT_RESULTS = "-1";
         expanded = "0";
@@ -35,13 +40,15 @@ public abstract class PiwikConnector {
     }
 
     public PiwikConnector(String HOST_URL, String LIMIT_RESULTS, String API_KEY,
-                          String LANGUAGE, String expanded, String flat) {
+                          String LANGUAGE, String ID_SITE, String expanded, String flat,
+                          PeriodEnum state, Date periodStart, Date periodEnd) {
         this.LIMIT_RESULTS = LIMIT_RESULTS;
         this.expanded = expanded;
         this.flat = flat;
         this.API_KEY = API_KEY;
         this.LANGUAGE = LANGUAGE;
         this.HOST_URL = HOST_URL;
+        this.ID_SITE = ID_SITE;
     }
 
     /**
@@ -51,7 +58,7 @@ public abstract class PiwikConnector {
      * @throws MalformedURLException Should be thrown if the implementation has a screwed up base url
      * @throws IOException Should be thrown if the remote resource is not available
      */
-    protected JsonObject getData() throws MalformedURLException, IOException {
+    public JsonObject getData() throws MalformedURLException, IOException {
         final String parameter = buildParametricString();
         final String urlString = HOST_URL + parameter;
         final URL url = new URL(urlString);
@@ -78,7 +85,40 @@ public abstract class PiwikConnector {
      * Standard parameter description for any point of time.
      * @return
      */
-    protected abstract HashMap<String, String> getPeriod();
+    public void setPeriod(PeriodEnum state, Date date) {
+        periodState = state;
+        periodStart = date;
+    }
+
+    public void setPeriod(Date startDate, Date endDate) {
+        // make it retard proof, just in case
+        if(startDate.before(endDate)) {
+            setPeriod(PeriodEnum.range, startDate);
+            periodEnd = endDate;
+        } else {
+            setPeriod(PeriodEnum.range, endDate);
+            periodStart = startDate;
+        }
+    }
+
+    protected HashMap<String, String> getPeriod(){
+        if(periodState == null || periodStart == null) {
+            throw new IllegalArgumentException("Object is in an invalid state, either is null: periodState, periodStart");
+        }
+        if(periodState == PeriodEnum.range && periodEnd == null) {
+            throw new IllegalStateException("Object is in an invalid state, selected period is range, yet no end date is set.");
+        }
+
+        return new HashMap<String, String>(){{
+            put("period", periodState.toString());
+            if(periodState != PeriodEnum.range) {
+                put("date", translateDate(periodStart));
+            } else {
+                put("date", translateDate(periodStart) + "," + translateDate(periodEnd));
+            }
+        }}; // am I writing Java Script now?
+    }
+
 
     protected String buildParametricString() {
         final String[] endPoint = getAPIEndpoint();
@@ -91,6 +131,7 @@ public abstract class PiwikConnector {
         params.putAll(new HashMap<String, String>(){{
                 put("module", endPoint[0]);                      // < This is probably bad practice
                 put("method", endPoint[0] + "." + endPoint[1]);  // < If not, then this is
+                put("idSite", ID_SITE);
                 put("token_auth", API_KEY);
                 put("language", LANGUAGE);
                 put("limit", LIMIT_RESULTS);
