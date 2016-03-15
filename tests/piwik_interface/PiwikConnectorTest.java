@@ -19,7 +19,7 @@ public class PiwikConnectorTest {
 
     @Test
     public void testBuildParametricString() throws Exception {
-        PiwikConnector pwc = new PiwikConnector("https://localhost/piwik/index.php?", "s59330") {
+        PiwikConnector pwc = new PiwikConnector("https://localhost/piwik/index.php?", "s59330", "wrongKey") {
             @Override
             protected String[] getAPIEndpoint() {
                 return new String[]{"API", "getBulkRequest"};
