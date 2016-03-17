@@ -3,10 +3,7 @@ package Exporters;
 import com.google.gson.*;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.formula.eval.NotImplementedException;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellAddress;
 import piwik_interface.PiwikConnector;
 import piwik_interface.piwik_endpoints.PiwikTransitionsForAction;
@@ -61,12 +58,17 @@ public class BaseExcelExporter {
 
     private final PiwikConnector dataSource;
     private final Workbook wb;
+    private final CellStyle titleStyle;
     private JsonObject data;
     private int rowPointer = 1, columnPointer = 0;
 
     public BaseExcelExporter(PiwikConnector dataSource) {
         this.dataSource = dataSource;
         wb = new HSSFWorkbook();
+        titleStyle = wb.createCellStyle();
+        Font f = wb.createFont();
+        f.setFontHeightInPoints((short) 18);
+        titleStyle.setFont(f);
     }
 
     public void export(File file) throws IOException {
@@ -86,7 +88,9 @@ public class BaseExcelExporter {
     private void createSheet(String title, JsonElement element) {
         Sheet page = wb.createSheet(title);
         Row topRow = page.createRow(0);
-        topRow.createCell(0).setCellValue(title);
+        Cell c = topRow.createCell(0);
+        c.setCellValue(title);
+        c.setCellStyle(titleStyle);
         writeData(page, element);
     }
 
@@ -105,6 +109,7 @@ public class BaseExcelExporter {
     }
 
     private void writeJsonNull(Sheet sheet, JsonElement element) {
+        writeJsonPrimitive(sheet, new JsonPrimitive("null"));
     }
 
     private void writeJsonPrimitive(Sheet sheet, JsonElement element) {
@@ -161,6 +166,15 @@ public class BaseExcelExporter {
     }
 
     private void writeJsonObject(Sheet sheet, JsonElement element) {
+        JsonObject jso = element.getAsJsonObject();
+        Row titleRow = sheet.createRow(rowPointer++);
 
+        for(Entry<String, JsonElement> single : jso.entrySet()) {
+            titleRow.createCell(columnPointer).setCellValue(single.getKey());
+            writeData(sheet, single.getValue());
+            columnPointer++;
+        }
+
+        rowPointer += 2;
     }
 }
